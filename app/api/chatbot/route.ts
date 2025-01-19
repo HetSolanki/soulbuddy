@@ -4,7 +4,10 @@ export const POST = async (req: NextRequest) => {
   const { inputValue } = await req.json(); // Extract inputValue from the request body
 
   if (!inputValue) {
-    return NextResponse.json({ error: "No input value provided" });
+    return NextResponse.json(
+      { error: "No input value provided" },
+      { status: 400 }
+    );
   }
 
   const applicationToken = process.env.APPLICATION_TOKEN;
@@ -15,7 +18,6 @@ export const POST = async (req: NextRequest) => {
   try {
     // Construct the API request URL
     const url = `${langflowBaseURL}/lf/${langflowId}/api/v1/run/${flowId}`;
-
     // Send request to Langflow API
     const response = await fetch(url, {
       method: "POST",
@@ -38,11 +40,41 @@ export const POST = async (req: NextRequest) => {
 
     // Parse and return the response from Langflow
     const data = await response.json();
-    return NextResponse.json(data);
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    };
+    return NextResponse.json(data, { headers: corsHeaders });
   } catch (error) {
     console.error("Error during LangFlow API request:", error.message);
-    return NextResponse.json({
-      error: error.message || "Error processing the request",
-    });
+    return NextResponse.json(
+      {
+        error: error.message || "Error processing the request",
+      },
+      {
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+      }
+    );
   }
+};
+
+// Handle OPTIONS requests for CORS preflight
+export const OPTIONS = () => {
+  return NextResponse.json(
+    {},
+    {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    }
+  );
 };
