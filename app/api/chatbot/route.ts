@@ -1,80 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import Cors from "cors";
+import initMiddleware from "@/lib/init-middleware";
 
-export const POST = async (req: NextRequest) => {
-  const { inputValue } = await req.json(); // Extract inputValue from the request body
+// Initialize the CORS middleware
+const cors = initMiddleware(
+  Cors({
+    origin: "*", // Allow all origins, change to specific domain for production
+    methods: ["GET", "POST", "OPTIONS"], // Allowed HTTP methods
+  })
+);
 
-  if (!inputValue) {
-    return NextResponse.json(
-      { error: "No input value provided" },
-      { status: 400 }
-    );
-  }
-
-  const applicationToken = process.env.APPLICATION_TOKEN;
-  const langflowBaseURL = process.env.LANGFLOW_BASE_URL;
-  const flowId = process.env.FLOW_ID;
-  const langflowId = process.env.LANGFLOW_ID;
+export async function POST(req) {
+  // Run CORS middleware
+  await cors(req);
 
   try {
+    const { inputValue } = await req.json();
+
+    if (!inputValue) {
+      return NextResponse.json(
+        { error: "No input value provided" },
+        { status: 400 }
+      );
+    }
+
+    const applicationToken = process.env.APPLICATION_TOKEN;
+    const langflowBaseURL = process.env.LANGFLOW_BASE_URL;
+    const flowId = process.env.FLOW_ID;
+    const langflowId = process.env.LANGFLOW_ID;
+
     // Construct the API request URL
     const url = `${langflowBaseURL}/lf/${langflowId}/api/v1/run/${flowId}`;
-    // Send request to Langflow API
     const response = await fetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${applicationToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ input_value: inputValue }), // Send the input data
+      body: JSON.stringify({ input_value: inputValue }),
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error(
-          "Authorization failed. The token may be expired or invalid."
-        );
-      } else {
-        throw new Error("An error occurred while interacting with LangFlow.");
-      }
+      throw new Error("Failed to fetch from Langflow API");
     }
 
-    // Parse and return the response from Langflow
     const data = await response.json();
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    };
-    return NextResponse.json(data, { headers: corsHeaders });
+    return NextResponse.json(data);
   } catch (error) {
-    console.error("Error during LangFlow API request:", error.message);
     return NextResponse.json(
-      {
-        error: error.message || "Error processing the request",
-      },
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        },
-      }
+      { error: error.message || "An error occurred" },
+      { status: 500 }
     );
   }
-};
+}
 
-// Handle OPTIONS requests for CORS preflight
-export const OPTIONS = () => {
-  return NextResponse.json(
-    {},
-    {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    }
-  );
-};
+// Handle OPTIONS preflight requests
+export async function OPTIONS(req) {
+  await cors(req);
+  return NextResponse.json({}, { status: 204 });
+}
